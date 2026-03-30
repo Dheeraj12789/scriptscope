@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScriptScope — Multi-Agent Script Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Roboto+Mono:wght@300;400;500&family=Playfair+Display:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-logo"><div class="d"></div> ScriptScope</a>
+  <div class="nav-right">
+    <a href="/architecture" class="btn btn-sm">How It Works</a>
+  </div>
+</nav>
+
+<form action="/analyze" method="post">
+<div class="split">
+  <!-- Left: Hero -->
+  <div class="split-left">
+    <div class="hero-badge"><span class="dot"></span> Multi-Agent Script Intelligence</div>
+    <h1 class="hero-title">Where Stories<br>Get <em>Analyzed</em></h1>
+    <p class="hero-desc">Four specialist AI agents dissect your script in parallel — story structure, emotional arc, engagement scoring, and improvement suggestions. Then they debate.</p>
+    <div class="agent-pills">
+      <div class="agent-pill"><div class="pill-dot" style="background:var(--blue)"></div> Story Analyst</div>
+      <div class="agent-pill"><div class="pill-dot" style="background:var(--coral)"></div> Emotion Analyst</div>
+      <div class="agent-pill"><div class="pill-dot" style="background:var(--orange)"></div> Engagement Scorer</div>
+      <div class="agent-pill"><div class="pill-dot" style="background:var(--green)"></div> Script Doctor</div>
+    </div>
+
+    <div class="phase-flow">
+      <div class="phase-card">
+        <div class="p-num">01</div><div class="p-icon">📝</div>
+        <h4>Parse</h4><p>Regex extraction</p>
+      </div>
+      <div class="phase-card">
+        <div class="p-num">02</div><div class="p-icon">🤖</div>
+        <h4>3 Agents</h4><p>Parallel analysis</p>
+      </div>
+      <div class="phase-card">
+        <div class="p-num">03</div><div class="p-icon">✍️</div>
+        <h4>Doctor</h4><p>Reads findings</p>
+      </div>
+      <div class="phase-card">
+        <div class="p-num">04</div><div class="p-icon">💬</div>
+        <h4>Debate</h4><p>2 rounds</p>
+      </div>
+      <div class="phase-card">
+        <div class="p-num">05</div><div class="p-icon">📊</div>
+        <h4>Report</h4><p>Final output</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Input -->
+  <div class="split-right">
+    {% if error %}
+    <div class="error-box">Error: {{ error }}</div>
+    {% endif %}
+
+    <div class="input-card">
+      <div class="input-header">
+        <span>Script Input</span>
+        <select class="sample-select" onchange="loadSample(this.value)">
+          <option value="">Load a sample...</option>
+          {% for name in samples %}
+          <option value="{{ name }}">{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <textarea name="script" class="script-area" id="script-area" placeholder="Paste your script here...
+
+Title: My Script
+
+Scene
+Description of the scene...
+
+Dialogue
+Character: Their dialogue line.
+Character2: Their response.
+
+[Stage directions in brackets]" required>{{ samples.values()|first if samples else '' }}</textarea>
+      <div class="input-footer">
+        <span class="char-info" id="char-count">0 chars</span>
+        <button type="submit" class="btn btn-blue" id="analyze-btn">Analyze with 4 Agents →</button>
+      </div>
+    </div>
+  </div>
+</div>
+</form>
+
+<!-- Loading overlay -->
+<div id="loading-overlay" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(250,250,250,0.95);backdrop-filter:blur(8px);flex-direction:column;align-items:center;justify-content:center">
+  <div style="text-align:center;max-width:480px;padding:0 24px">
+    <div class="spinner" style="width:40px;height:40px;margin-bottom:20px"></div>
+    <h2 style="font-size:22px;font-weight:700;margin-bottom:8px" id="loading-title">Analyzing your script...</h2>
+    <p style="font-size:14px;color:var(--text2);margin-bottom:32px">4 specialist agents are working in parallel</p>
+
+    <!-- Pipeline steps -->
+    <div style="text-align:left;max-width:360px;margin:0 auto">
+      <div class="pipeline-step" id="step-1" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div class="step-icon" style="width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--green-bg);color:var(--green)">✓</div>
+        <div><div style="font-size:13px;font-weight:600">Script Parsed</div><div style="font-size:11px;color:var(--text3)">Characters, beats, scenes extracted</div></div>
+      </div>
+      <div class="pipeline-step" id="step-2" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div class="step-icon" style="width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--blue-bg);color:var(--blue)">
+          <div class="spinner" style="width:16px;height:16px;border-width:2px;margin:0"></div>
+        </div>
+        <div><div style="font-size:13px;font-weight:600">3 Agents Analyzing</div><div style="font-size:11px;color:var(--text3)">Story · Emotion · Engagement (parallel)</div></div>
+      </div>
+      <div class="pipeline-step" id="step-3" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);opacity:0.4">
+        <div class="step-icon" style="width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--panel);color:var(--text3)">3</div>
+        <div><div style="font-size:13px;font-weight:600">Script Doctor</div><div style="font-size:11px;color:var(--text3)">Reads findings → suggestions</div></div>
+      </div>
+      <div class="pipeline-step" id="step-4" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);opacity:0.4">
+        <div class="step-icon" style="width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--panel);color:var(--text3)">4</div>
+        <div><div style="font-size:13px;font-weight:600">Agent Debate</div><div style="font-size:11px;color:var(--text3)">2 rounds of cross-review</div></div>
+      </div>
+      <div class="pipeline-step" id="step-5" style="display:flex;align-items:center;gap:12px;padding:10px 0;opacity:0.4">
+        <div class="step-icon" style="width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--panel);color:var(--text3)">5</div>
+        <div><div style="font-size:13px;font-weight:600">Rewrite & Re-score</div><div style="font-size:11px;color:var(--text3)">2 variant scripts generated & scored</div></div>
+      </div>
+    </div>
+
+    <div style="margin-top:24px;font-family:'Roboto Mono',monospace;font-size:11px;color:var(--text3)" id="loading-timer">0s elapsed</div>
+  </div>
+</div>
+
+<script>
+const samples = {{ samples | tojson }};
+const textarea = document.getElementById('script-area');
+const charCount = document.getElementById('char-count');
+
+function loadSample(name) {
+  if (samples[name]) {
+    textarea.value = samples[name];
+    updateCount();
+  }
+}
+
+function updateCount() {
+  const text = textarea.value;
+  const lines = text.split('\n').filter(l => l.trim()).length;
+  charCount.textContent = `${text.length} chars · ${lines} lines`;
+}
+
+textarea.addEventListener('input', updateCount);
+updateCount();
+
+// Pipeline step animation timing (estimated)
+const stepTimings = [
+  { step: 2, delay: 0,     title: '3 Agents Analyzing', sub: 'Story · Emotion · Engagement (parallel)' },
+  { step: 3, delay: 15000, title: 'Script Doctor', sub: 'Reading findings → generating suggestions' },
+  { step: 4, delay: 30000, title: 'Agent Debate', sub: 'Cross-reviewing each other\'s findings' },
+  { step: 5, delay: 50000, title: 'Rewrite & Re-score', sub: 'Generating 2 variant scripts' },
+];
+
+let timerInterval;
+
+document.querySelector('form').addEventListener('submit', function() {
+  document.getElementById('analyze-btn').textContent = 'Analyzing...';
+  document.getElementById('analyze-btn').disabled = true;
+
+  // Show loading overlay
+  const overlay = document.getElementById('loading-overlay');
+  overlay.style.display = 'flex';
+
+  // Start timer
+  const startTime = Date.now();
+  timerInterval = setInterval(() => {
+    const elapsed = Math.round((Date.now() - startTime) / 1000);
+    document.getElementById('loading-timer').textContent = elapsed + 's elapsed';
+  }, 1000);
+
+  // Animate pipeline steps
+  stepTimings.forEach(({ step, delay, title, sub }) => {
+    setTimeout(() => {
+      // Mark previous step as done
+      if (step > 2) {
+        const prevStep = document.getElementById('step-' + (step - 1));
+        if (prevStep) {
+          prevStep.style.opacity = '1';
+          prevStep.querySelector('.step-icon').innerHTML = '✓';
+          prevStep.querySelector('.step-icon').style.background = 'var(--green-bg)';
+          prevStep.querySelector('.step-icon').style.color = 'var(--green)';
+        }
+      }
+      // Activate current step
+      const currStep = document.getElementById('step-' + step);
+      if (currStep) {
+        currStep.style.opacity = '1';
+        currStep.querySelector('.step-icon').innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;margin:0"></div>';
+        currStep.querySelector('.step-icon').style.background = 'var(--blue-bg)';
+        currStep.querySelector('.step-icon').style.color = 'var(--blue)';
+      }
+      document.getElementById('loading-title').textContent = title + '...';
+    }, delay);
+  });
+});
+</script>
+</body>
+</html>

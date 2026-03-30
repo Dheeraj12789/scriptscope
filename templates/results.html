@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScriptScope — {{ result.title }}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Roboto+Mono:wght@300;400;500&family=Playfair+Display:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-logo"><div class="d"></div> ScriptScope</a>
+  <div class="nav-right">
+    <a href="/" class="btn btn-sm">← New Analysis</a>
+    <a href="/architecture" class="btn btn-sm">How It Works</a>
+    <button class="btn btn-sm" onclick="exportJSON()">Export JSON</button>
+  </div>
+</nav>
+
+<div class="split">
+  <!-- LEFT: Report -->
+  <div class="split-left">
+
+    <!-- Banner -->
+    <div class="report-banner">
+      <div class="r-label">ANALYSIS REPORT</div>
+      <h2>"{{ result.title }}"</h2>
+      <div class="r-meta">{{ result.metadata.total_agents }} agents · {{ result.metadata.debate_rounds }} debate rounds · {{ result.metadata.revisions }} revisions · {{ result.metadata.get('variants_generated', 0) }} variants · {{ result.metadata.duration_seconds }}s</div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('report')">Report</button>
+      <button class="tab" onclick="showTab('debate')">Debate Log</button>
+      <button class="tab" onclick="showTab('chat')">Chat with Agents</button>
+      <button class="tab" onclick="showTab('variants')">Variants ({{ result.variants|length }})</button>
+      <button class="tab" onclick="showTab('json')">Raw JSON</button>
+    </div>
+
+    <!-- TAB: Report -->
+    <div class="tab-content active" id="tab-report">
+
+      <!-- 01 Summary -->
+      <div class="section">
+        <div class="section-num">01</div>
+        <div class="section-title">Story Summary <span class="agent-badge">Story Analyst</span></div>
+        <div class="section-body">{{ result.story.summary }}</div>
+        <div style="margin-top:8px;font-size:12px;color:var(--text3)">
+          <strong style="color:var(--text)">Structure:</strong> {{ result.story.narrative_structure }}<br>
+          <strong style="color:var(--text)">Plot type:</strong> {{ result.story.plot_type }}
+        </div>
+        <div class="tags">
+          {% for tag in result.story.tags %}
+          <span class="tag tag-{% if loop.index % 3 == 1 %}blue{% elif loop.index % 3 == 2 %}coral{% else %}purple{% endif %}">{{ tag }}</span>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- 02 Suggestions -->
+      <div class="section">
+        <div class="section-num">02</div>
+        <div class="section-title">Improvement Suggestions <span class="agent-badge">Script Doctor</span></div>
+        {% for s in result.suggestions %}
+        <div class="sug-item">
+          <span class="sug-num">{{ '%02d' % loop.index }}</span>
+          <div class="sug-body">
+            <h4>{{ s.title }} <span class="sug-cat">{{ s.category }}</span></h4>
+            <p>{{ s.description }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- 03 Cliffhanger -->
+      {% if result.cliffhanger %}
+      <div class="section">
+        <div class="section-num">03</div>
+        <div class="section-title">Peak Cliffhanger <span class="agent-badge">Script Doctor</span></div>
+        <div class="cliff-card">
+          <div class="cliff-quote">"{{ result.cliffhanger.quote }}"</div>
+          <div class="cliff-why">{{ result.cliffhanger.explanation }}</div>
+          <div class="cliff-score">◆ TENSION: {{ result.cliffhanger.tension_score }} / 10</div>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+
+    <!-- TAB: Debate -->
+    <div class="tab-content" id="tab-debate">
+      <div class="section">
+        <div class="section-title">Debate Log <span class="agent-badge">{{ result.debate_log|length }} entries</span></div>
+        {% for d in result.debate_log %}
+        <div class="debate-entry">
+          <div class="de-avatar" style="background:var(--{% if d.action == 'challenge' %}coral{% elif d.action == 'support' %}green{% elif d.action == 'revise' %}blue{% else %}orange{% endif %}-bg)">
+            {% if 'Story' in d.source_agent %}📖{% elif 'Emotion' in d.source_agent %}🎭{% elif 'Engagement' in d.source_agent %}⚡{% else %}✍️{% endif %}
+          </div>
+          <div>
+            <div class="de-top">
+              <span class="de-name">{{ d.source_agent }}</span>
+              <span class="de-arrow">→</span>
+              <span>{{ d.target_agent }}</span>
+              <span class="de-action act-{{ d.action }}">{{ d.action|upper }}</span>
+              {% if d.claim_referenced %}<span class="agent-badge">{{ d.claim_referenced }}</span>{% endif %}
+            </div>
+            <div class="de-msg">{{ d.message }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- TAB: Chat -->
+    <div class="tab-content" id="tab-chat">
+      <div class="section">
+        <div class="section-title">Chat with Agents</div>
+        <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="selectAgent('Story Analyst')" id="btn-Story Analyst">📖 Story Analyst</button>
+          <button class="btn btn-sm" onclick="selectAgent('Emotion Analyst')" id="btn-Emotion Analyst">🎭 Emotion Analyst</button>
+          <button class="btn btn-sm" onclick="selectAgent('Engagement Scorer')" id="btn-Engagement Scorer">⚡ Engagement Scorer</button>
+          <button class="btn btn-sm" onclick="selectAgent('Script Doctor')" id="btn-Script Doctor">✍️ Script Doctor</button>
+        </div>
+        <div class="chat-container">
+          <div class="chat-messages" id="chat-messages"></div>
+          <div class="chat-input-row">
+            <input class="chat-input" id="chat-input" placeholder="Ask a question about the analysis..." onkeydown="if(event.key==='Enter')sendChat()">
+            <button class="btn btn-blue" onclick="sendChat()">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: JSON -->
+    <!-- TAB: Variants -->
+    <div class="tab-content" id="tab-variants">
+      <div class="section">
+        <div class="section-title">Script Variants — Rewrite + Re-score <span class="agent-badge">RL-style feedback loop</span></div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:20px">
+          Each variant applies one suggestion, rewrites the script, then re-scores with the Engagement Scorer. Compare to the original score of <strong>{{ '%.1f' % result.engagement.overall }}/10</strong>.
+        </p>
+
+        {% for sv in result.variants %}
+        <div style="border:1px solid var(--border);border-radius:var(--r);margin-bottom:16px;overflow:hidden;background:var(--white)">
+          <!-- Variant header -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);{% if sv.score_delta > 0 %}background:var(--green-bg){% elif sv.score_delta < 0 %}background:rgba(239,68,68,.04){% else %}background:var(--panel){% endif %}">
+            <div>
+              <div style="font-size:14px;font-weight:700">{{ sv.variant.variant_name }}</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px">Applied: {{ sv.variant.focus }}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:24px;font-weight:800;{% if sv.score_delta > 0 %}color:var(--green){% elif sv.score_delta < 0 %}color:var(--red){% else %}color:var(--text3){% endif %}">
+                {{ '%.1f' % sv.engagement.overall }}<small style="font-size:12px;font-weight:400;color:var(--text3)">/10</small>
+              </div>
+              <div style="font-family:'Roboto Mono',monospace;font-size:11px;{% if sv.score_delta > 0 %}color:var(--green){% elif sv.score_delta < 0 %}color:var(--red){% else %}color:var(--text3){% endif %}">
+                {% if sv.score_delta > 0 %}+{% endif %}{{ '%.2f' % sv.score_delta }} vs original
+              </div>
+            </div>
+          </div>
+
+          <!-- Score comparison bars -->
+          <div style="padding:14px 18px;border-bottom:1px solid var(--border)">
+            <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Factor Comparison</div>
+            {% for new_f in sv.engagement.factors %}
+            {% set orig_f_score = 0 %}
+            {% for of in result.engagement.factors %}
+              {% if of.name|lower == new_f.name|lower %}
+                {% set orig_f_score = of.score %}
+              {% endif %}
+            {% endfor %}
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-size:11px;color:var(--text3);min-width:85px">{{ new_f.name|title }}</span>
+              <div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;position:relative">
+                <div style="height:100%;border-radius:2px;background:var(--blue);width:{{ new_f.score * 10 }}%"></div>
+              </div>
+              <span style="font-family:'Roboto Mono',monospace;font-size:11px;font-weight:600;min-width:28px;text-align:right;color:var(--blue)">{{ '%.1f' % new_f.score }}</span>
+            </div>
+            {% endfor %}
+          </div>
+
+          <!-- Improvement summary -->
+          <div style="padding:14px 18px;border-bottom:1px solid var(--border)">
+            <div style="font-size:12px;color:var(--text2);line-height:1.6">{{ sv.improvement_summary }}</div>
+          </div>
+
+          <!-- Changes made -->
+          <div style="padding:14px 18px;border-bottom:1px solid var(--border)">
+            <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Changes Made</div>
+            {% for change in sv.variant.changes_made %}
+            <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:4px">
+              <span style="color:var(--green);font-size:12px">•</span>
+              <span style="font-size:12px;color:var(--text2)">{{ change }}</span>
+            </div>
+            {% endfor %}
+          </div>
+
+          <!-- Rewritten script (collapsible) -->
+          <details style="padding:0">
+            <summary style="padding:14px 18px;font-size:12px;font-weight:600;cursor:pointer;color:var(--blue)">View Rewritten Script</summary>
+            <pre style="padding:14px 18px;font-family:'Roboto Mono',monospace;font-size:11px;line-height:1.7;background:var(--panel);white-space:pre-wrap;border-top:1px solid var(--border)">{{ sv.variant.rewritten_script }}</pre>
+          </details>
+        </div>
+        {% endfor %}
+
+        {% if not result.variants %}
+        <div style="text-align:center;padding:40px;color:var(--text3)">No variants generated.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-json">
+      <pre style="font-family:'Roboto Mono',monospace;font-size:11px;line-height:1.5;background:var(--panel);padding:16px;border-radius:var(--r);overflow-x:auto;max-height:600px;border:1px solid var(--border)">{{ result_json }}</pre>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: Visualizations -->
+  <div class="split-right">
+
+    <!-- Engagement Score -->
+    <div class="section">
+      <div class="section-title">⚡ Engagement Score</div>
+      <div class="score-layout">
+        <div class="score-big">{{ '%.1f' % result.engagement.overall }}<small>/10</small></div>
+        <div class="score-bars">
+          {% set colors = {'hook': 'var(--blue)', 'conflict': 'var(--orange)', 'tension': 'var(--red)', 'depth': 'var(--purple)', 'cliffhanger': 'var(--blue)', 'resolution': 'var(--text4)'} %}
+          {% for f in result.engagement.factors %}
+          <div class="sb-row">
+            <span class="sb-label">{{ f.name|title }}</span>
+            <div class="sb-track"><div class="sb-fill" style="width:{{ f.score * 10 }}%;background:{{ colors.get(f.name|lower, 'var(--blue)') }}"></div></div>
+            <span class="sb-val" style="color:{{ colors.get(f.name|lower, 'var(--blue)') }}">{{ '%.1f' % f.score }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="scoring-note">{{ result.engagement.scoring_note }}</div>
+
+      <!-- Evidence for each factor -->
+      {% for f in result.engagement.factors %}
+      {% if f.evidence_lines %}
+      <div style="margin-top:12px">
+        <div style="font-family:'Roboto Mono',monospace;font-size:10px;color:var(--text3);margin-bottom:4px">{{ f.name|upper }}: {{ '%.1f' % f.score }}</div>
+        {% for line in f.evidence_lines[:2] %}
+        <div class="evidence-item">
+          <span class="ev-text">"{{ line }}"</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+
+    <!-- Emotional Arc -->
+    <div class="section">
+      <div class="section-title">🎭 Emotional Arc</div>
+
+      {% set emotion_colors = {
+        'shock': 'var(--blue)', 'anger': 'var(--red)', 'guilt': '#6b7280',
+        'hope': 'var(--green)', 'sadness': '#6b7280', 'tension': 'var(--purple)',
+        'vulnerability': '#ec4899', 'uncertainty': 'var(--yellow)', 'joy': 'var(--green)',
+        'relief': '#22d3ee', 'fear': '#6b7280', 'nostalgia': '#d97706',
+        'revelation': 'var(--orange)', 'defiance': 'var(--red)', 'resignation': '#6b7280'
+      } %}
+
+      <div class="arc-chart">
+        {% for beat in result.emotional_arc.beats %}
+        <div class="arc-col">
+          <div class="arc-bar" style="height:{{ (beat.intensity * 100)|int }}%;background:{{ emotion_colors.get(beat.primary_emotion, 'var(--blue)') }}" title="{{ beat.primary_emotion }}: {{ beat.intensity }}"></div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="arc-labels">
+        {% for beat in result.emotional_arc.beats %}
+        <div class="arc-lbl">
+          {{ beat.character[:3] }}<br>
+          <strong style="color:{{ emotion_colors.get(beat.primary_emotion, 'var(--blue)') }}">{{ beat.primary_emotion }}</strong><br>
+          {{ beat.intensity }}
+        </div>
+        {% endfor %}
+      </div>
+
+      <div style="margin-top:16px;font-size:12px;color:var(--text2)">
+        <strong>Arc:</strong> {{ result.emotional_arc.arc_type }}<br>
+        <strong>Dominant:</strong> {{ result.emotional_arc.dominant_emotions | join(', ') }}
+        {% if result.emotional_arc.turning_point %}<br><strong>Turning point:</strong> {{ result.emotional_arc.turning_point }}{% endif %}
+      </div>
+    </div>
+
+    <!-- Metadata trace -->
+    <div class="trace-bar">
+      <div class="tb-header">
+        <h3>Pipeline Metadata</h3>
+        <span>{{ result.metadata.total_agents }} agents · {{ result.metadata.duration_seconds }}s</span>
+      </div>
+      <div class="tb-body">
+        Model: {{ result.metadata.model }}<br>
+        Characters: {{ result.metadata.total_characters }} · Beats: {{ result.metadata.total_beats }}<br>
+        Debate rounds: {{ result.metadata.debate_rounds }} · Revisions: {{ result.metadata.revisions }}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const analysisData = {{ result_json | safe }};
+let currentAgent = 'Story Analyst';
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function selectAgent(name) {
+  currentAgent = name;
+  document.querySelectorAll('.chat-container .btn-sm, [id^="btn-"]').forEach(b => {
+    b.style.background = '';
+    b.style.color = '';
+    b.style.borderColor = '';
+  });
+  const btn = document.getElementById('btn-' + name);
+  if (btn) {
+    btn.style.background = 'var(--blue)';
+    btn.style.color = '#fff';
+    btn.style.borderColor = 'var(--blue)';
+  }
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  const messages = document.getElementById('chat-messages');
+  messages.innerHTML += `<div class="msg user"><div class="msg-avatar" style="background:var(--coral-bg);color:var(--coral)">You</div><div class="msg-bubble">${msg}</div></div>`;
+  input.value = '';
+
+  messages.innerHTML += `<div class="msg" id="typing"><div class="msg-avatar">🤖</div><div class="msg-bubble" style="color:var(--text3)">Thinking...</div></div>`;
+  messages.scrollTop = messages.scrollHeight;
+
+  try {
+    const res = await fetch('/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ agent: currentAgent, message: msg, analysis: analysisData }),
+    });
+    const data = await res.json();
+    document.getElementById('typing').remove();
+    const icon = currentAgent.includes('Story') ? '📖' : currentAgent.includes('Emotion') ? '🎭' : currentAgent.includes('Engagement') ? '⚡' : '✍️';
+    messages.innerHTML += `<div class="msg"><div class="msg-avatar">${icon}</div><div class="msg-bubble">${data.response}</div></div>`;
+  } catch (e) {
+    document.getElementById('typing').remove();
+    messages.innerHTML += `<div class="msg"><div class="msg-avatar">❌</div><div class="msg-bubble" style="color:var(--red)">Error: ${e.message}</div></div>`;
+  }
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(analysisData, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `scriptscope_${analysisData.title.replace(/\s+/g, '_')}.json`;
+  a.click();
+}
+
+selectAgent('Story Analyst');
+</script>
+</body>
+</html>

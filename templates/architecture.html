@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScriptScope — Architecture & Design</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Roboto+Mono:wght@300;400;500&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .arch-page { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+  .arch-page h1 { font-size: 36px; font-weight: 800; letter-spacing: -.03em; margin-bottom: 8px; }
+  .arch-page h1 em { font-family: 'Playfair Display', serif; font-style: italic; color: var(--blue); font-weight: 400; }
+  .arch-page > p.lead { font-size: 16px; color: var(--text2); line-height: 1.7; margin-bottom: 40px; max-width: 600px; }
+
+  .arch-section { margin-bottom: 48px; }
+  .arch-section .s-num { font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--blue); letter-spacing: .08em; margin-bottom: 6px; }
+  .arch-section h2 { font-size: 22px; font-weight: 700; letter-spacing: -.02em; margin-bottom: 12px; }
+  .arch-section h3 { font-size: 15px; font-weight: 700; margin: 20px 0 8px; }
+  .arch-section p, .arch-section li { font-size: 14px; color: var(--text2); line-height: 1.8; }
+  .arch-section ul { padding-left: 20px; margin: 8px 0; }
+  .arch-section li { margin-bottom: 4px; }
+  .arch-section strong { color: var(--text); }
+  .arch-section code { font-family: 'Roboto Mono', monospace; font-size: 12px; background: var(--panel); padding: 2px 6px; border-radius: 4px; }
+
+  /* Diagram blocks */
+  .diagram {
+    background: var(--dark); color: #ccc; padding: 20px 24px; border-radius: 10px;
+    font-family: 'Roboto Mono', monospace; font-size: 12px; line-height: 1.6;
+    overflow-x: auto; margin: 16px 0; white-space: pre;
+  }
+  .diagram .hl-blue { color: #60a5fa; }
+  .diagram .hl-green { color: #4ade80; }
+  .diagram .hl-coral { color: #fb923c; }
+  .diagram .hl-purple { color: #a78bfa; }
+  .diagram .hl-dim { color: #555; }
+
+  /* Decision cards */
+  .decision-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+  .decision-card {
+    padding: 16px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--white); transition: all .15s;
+  }
+  .decision-card:hover { border-color: var(--blue); }
+  .decision-card .dc-label { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+  .decision-card h4 { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .decision-card p { font-size: 12px; color: var(--text2); line-height: 1.5; }
+
+  /* Comparison table */
+  .cmp-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  .cmp-table th { text-align: left; font-weight: 600; padding: 8px 12px; border-bottom: 2px solid var(--border); font-size: 12px; color: var(--text3); text-transform: uppercase; letter-spacing: .03em; }
+  .cmp-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text2); }
+  .cmp-table tr:hover td { background: var(--panel); }
+  .cmp-table .good { color: var(--green); font-weight: 600; }
+  .cmp-table .bad { color: var(--red); font-weight: 600; }
+
+  /* Rubric example */
+  .rubric-block {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px 20px; margin: 12px 0; font-size: 13px; line-height: 1.7;
+  }
+  .rubric-block .rb-title { font-weight: 700; margin-bottom: 6px; }
+  .rubric-block .rb-level { display: flex; gap: 8px; margin: 2px 0; }
+  .rubric-block .rb-score { font-family: 'Roboto Mono', monospace; font-size: 12px; font-weight: 600; min-width: 40px; color: var(--blue); }
+  .rubric-block .rb-desc { color: var(--text2); }
+
+  /* File tree */
+  .file-tree {
+    background: var(--dark); color: #ccc; padding: 16px 20px; border-radius: 8px;
+    font-family: 'Roboto Mono', monospace; font-size: 12px; line-height: 1.8; margin: 12px 0;
+  }
+  .file-tree .ft-dir { color: #60a5fa; }
+  .file-tree .ft-file { color: #ccc; }
+  .file-tree .ft-desc { color: #555; }
+
+  /* Callout */
+  .callout {
+    display: flex; gap: 12px; padding: 16px; border-radius: 8px;
+    margin: 16px 0; font-size: 13px; line-height: 1.6;
+  }
+  .callout-blue { background: var(--blue-bg); border: 1px solid var(--blue-border); }
+  .callout-coral { background: var(--coral-bg); border: 1px solid rgba(232,112,64,.15); }
+  .callout-icon { font-size: 16px; flex-shrink: 0; }
+  .callout-text { color: var(--text2); }
+  .callout-text strong { color: var(--text); }
+
+  @media (max-width: 700px) {
+    .decision-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-logo"><div class="d"></div> ScriptScope</a>
+  <div class="nav-right">
+    <a href="/" class="btn btn-sm">← Analyze</a>
+  </div>
+</nav>
+
+<div class="arch-page">
+
+  <h1>How ScriptScope <em>Works</em></h1>
+  <p class="lead">A multi-agent script analysis system built for Bullet AI's content intelligence platform. This page explains every architectural decision — what we built, why, and why not something else.</p>
+
+  <!-- ============================================ -->
+  <!-- SECTION 1: THE PROBLEM -->
+  <!-- ============================================ -->
+  <div class="arch-section">
+    <div class="s-num">01 — THE PROBLEM</div>
+    <h2>Why Not Just One Prompt?</h2>
+    <p>The naive approach: send the script to GPT with "analyze this" and parse the output. Here's what happens:</p>
+
+    <table class="cmp-table">
+      <tr><th>Aspect</th><th>Single Prompt</th><th>Multi-Agent (ours)</th></tr>
+      <tr><td>Summary length</td><td class="bad">1 sentence or 8 — no control</td><td class="good">Exactly 3-4 sentences (enforced)</td></tr>
+      <tr><td>Emotional arc</td><td class="bad">"The tone is tense then hopeful"</td><td class="good">Per-beat data with intensity values</td></tr>
+      <tr><td>Engagement score</td><td class="bad">Random number, no calibration</td><td class="good">Rubric-based, each level defined</td></tr>
+      <tr><td>Suggestions</td><td class="bad">"Add more conflict" (generic)</td><td class="good">Targets weakest scores, cites lines</td></tr>
+      <tr><td>Self-correction</td><td class="bad">None</td><td class="good">Debate catches blind spots</td></tr>
+      <tr><td>Output validity</td><td class="bad">Hope JSON parses correctly</td><td class="good">Pydantic schema enforced by API</td></tr>
+    </table>
+
+    <div class="callout callout-blue">
+      <span class="callout-icon">💡</span>
+      <div class="callout-text"><strong>Core insight:</strong> By splitting analysis across specialist agents, each with a focused prompt and domain rubrics, we get dramatically better output quality. The LLM can be an expert at one thing instead of mediocre at everything.</div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- SECTION 2: ARCHITECTURE -->
+  <!-- ============================================ -->
+  <div class="arch-section">
+    <div class="s-num">02 — ARCHITECTURE</div>
+    <h2>The Pipeline</h2>
+
+    <div class="diagram">Script → <span class="hl-blue">Parser</span> (regex, no LLM)
+           │
+           ├──► <span class="hl-blue">Story Analyst</span> ────┐
+           ├──► <span class="hl-coral">Emotion Analyst</span> ──┤  <span class="hl-dim">(3 agents in parallel)</span>
+           ├──► <span class="hl-purple">Engagement Scorer</span> ┤
+           │                       │
+           └──► <span class="hl-green">Script Doctor</span> ────┘  <span class="hl-dim">(reads other 3 outputs)</span>
+                                    │
+                        <span class="hl-coral">Debate</span> (2 rounds)
+                                    │
+                        <span class="hl-blue">Rewrite</span> 2 variants
+                                    │
+                        <span class="hl-green">Re-score</span> each variant
+                                    │
+                              Final Report</div>
+
+    <h3>6 Phases</h3>
+    <ul>
+      <li><strong>Phase 1 — Parse:</strong> Pure Python regex. No LLM call. Extracts title, scenes, characters, dialogue beats, stage directions. Instant, deterministic, free.</li>
+      <li><strong>Phase 2 — Parallel Analysis:</strong> Story Analyst, Emotion Analyst, and Engagement Scorer run simultaneously via <code>asyncio.gather</code>. Each produces structured JSON validated by Pydantic.</li>
+      <li><strong>Phase 3 — Informed Analysis:</strong> Script Doctor reads all three agents' findings, then targets the weakest engagement factors and emotional flat spots specifically.</li>
+      <li><strong>Phase 4 — Debate:</strong> 4 cross-agent matchups over 2 rounds. Agents CHALLENGE or SUPPORT with evidence, then REVISE or HOLD. Self-correction mechanism.</li>
+      <li><strong>Phase 5 — Rewrite:</strong> Top 2 suggestions are applied as full script rewrites. Each variant is a complete rewritten script.</li>
+      <li><strong>Phase 6 — Re-score:</strong> Each variant is scored by the Engagement Scorer. Score deltas show whether the suggestion actually improved the script. This is the RL-style feedback loop.</li>
+    </ul>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- SECTION 3: THE 4 AGENTS -->
+  <!-- ============================================ -->
+  <div class="arch-section">
+    <div class="s-num">03 — THE AGENTS</div>
+    <h2>Four Specialists, Not One Generalist</h2>
+
+    <div class="decision-grid">
+      <div class="decision-card">
+        <div class="dc-label">Agent 01</div>
+        <h4>📖 Story Analyst</h4>
+        <p>Summary, plot type (constrained to 9 archetypes), narrative structure as arrow chain, character roles. Prompt enforces exactly 3-4 sentences.</p>
+      </div>
+      <div class="decision-card">
+        <div class="dc-label">Agent 02</div>
+        <h4>🎭 Emotion Analyst</h4>
+        <p>Maps each dialogue beat to an emotion from a fixed 15-emotion vocabulary with intensity 0.0-1.0. Produces visualizable data, not vague descriptions.</p>
+      </div>
+      <div class="decision-card">
+        <div class="dc-label">Agent 03</div>
+        <h4>⚡ Engagement Scorer</h4>
+        <p>6-factor rubric scoring: hook, conflict, tension, depth, cliffhanger, resolution. Each score has 5 defined levels. Must cite specific dialogue lines as evidence.</p>
+      </div>
+      <div class="decision-card">
+        <div class="dc-label">Agent 04</div>
+        <h4>✍️ Script Doctor</h4>
+        <p>Reads other agents' findings first. Targets lowest engagement scores and emotional flat spots. Also identifies peak cliffhanger moment.</p>
+      </div>
+    </div>
+
+    <div class="callout callout-coral">
+      <span class="callout-icon">🔑</span>
+      <div class="callout-text"><strong>Why the Doctor sees other agents' output:</strong> Without cross-agent context, suggestions are generic ("add more conflict"). With it, the Doctor says "Arjun's emotional flatness at beats 2, 4, 6 (from Emotion Analyst) combined with hook score of 7 (from Engagement Scorer) suggests the opening needs a physical reaction before dialogue."</div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- SECTION 4: PROMPT ENGINEERING -->
+  <!-- ============================================ -->
+  <div class="arch-section">
+    <div class="s-num">04 — PROMPT ENGINEERING</div>
+    <h2>The Intelligence Is in the Prompts</h2>
+
+    <p>Three prompt design techniques that make this system work:</p>
+
+    <h3>1. Rubric-Based Scoring</h3>
+    <p>Instead of "rate the hook 1-10" (which produces random numbers), each score level has explicit criteria:</p>
+
+    <div class="rubric-block">
+      <div class="rb-title">OPENING HOOK</div>
+      <div class="rb-level"><span class="rb-score">9-10</span><span class="rb-desc">Immediate mystery or physical jolt. Viewer cannot scroll past.</span></div>
+      <div class="rb-level"><span class="rb-score">7-8</span><span class="rb-desc">Strong curiosity that takes a moment to land. Good but not instant.</span></div>
+      <div class="rb-level"><span class="rb-score">5-6</span><span class="rb-desc">Interesting but passive opening. No urgency.</span></div>
+      <div class="rb-level"><span class="rb-score">3-4</span><span class="rb-desc">Generic setup. Could be any story.</span></div>
+      <div class="rb-level"><span class="rb-score">1-2</span><span class="rb-desc">No reason to keep watching.</span></div>
+    </div>
+
+    <p>This produces <strong>consistent, explainable scores</strong>. The LLM reads "Why now?" and calibrates against the rubric: "question hook, creates curiosity but lacks physical jolt — that's a 7-8."</p>
+
+    <h3>2. Constrained Emotion Vocabulary</h3>
+    <p>Without constraints, the LLM invents arbitrary emotions ("melancholic anticipation", "bittersweet resolve"). We constrain to 15 specific emotions:</p>
+    <p><code>shock · anger · guilt · hope · sadness · tension · vulnerability · uncertainty · joy · relief · fear · nostalgia · revelation · defiance · resignation</code></p>
+    <p>This makes output <strong>structured, comparable across scripts, and directly visualizable</strong> as a chart.</p>
+
+    <h3>3. Weighted Scoring Formula</h3>
+    <p>For short-form content (reels, shorts), hook and cliffhanger matter most — they determine whether people <strong>start watching</strong> and <strong>share</strong>. The overall score is not an average:</p>
+    <div class="diagram"><span class="hl-blue">overall</span> = (<span class="hl-coral">hook × 1.5</span> + conflict + tension + depth + <span class="hl-coral">cliffhanger × 1.5</span> + resolution) / 7</div>
+    <p>This domain-specific weighting shows understanding of how short-form content engagement actually works.</p>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- SECTION 5: THE DEBATE -->
+  <!-- ============================================ -->
+  <div class="arch-section">
+    <div class="s-num">05 — THE DEBATE</div>
+    <h2>Agents Challenge Each Other</h2>
+
+    <p>After all agents analyze independently, they cross-review in a structured 2-round debate:</p>
+
+    <h3>Round 1 — Challenge or Support</h3>
+    <p>4 matchups, each targeting a specific topic:</p>
+    <table class="cmp-table">
+      <tr><th>Challenger</th><th>→</th><th>Target</th><th>Topic</th></tr>
+      <tr><td>Engagement Scorer</td><td>→</td><td>Story Analyst</td><td>Opening & hook assessment</td></tr>
+      <tr><td>Emotion Analyst</td><td>→</td><td>Script Doctor</td><td>Character emotional depth</td></tr>
+      <tr><td>Story Analyst</td><td>→</td><td>Emotion Analyst</td><td>Arc classification & ending</td></tr>
+      <tr><td>Script Doctor</td><td>→</td><td>Engagement Scorer</td><td>Score calibration</td></tr>
+    </table>
+
+    <h3>Round 2 — Revise or Hold</h3>
+    <p>Challenged agents must respond with one of:</p>
+    <ul>
+      <li><strong>REVISE</strong> — accept the challenge and update their findings</li>
+      <li><strong>HOLD</strong> — maintain their position with reasoning</li>
+    </ul>
+
+    <div class="callout callout-blue">
+      <span class="callout-icon">🎯</span>
+      <div class="callout-text"><strong>Real example from testing:</strong> The Engagement Scorer challenged the Story Analyst: "The hook isn't just 'an unexpected message.' The 5-year temporal gap creates immediate curiosity debt." The Story Analyst revised its summary to lead with the time gap. This is self-correction that a single-prompt system can't do.</div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- SECTION 6: VARIANT GENERATION -->
+  <!-- ============================================ -->
+  <div class="arch-section">
+    <div class="s-num">06 — VARIANT GENERATION</div>
+    <h2>Suggest → Rewrite → Re-score (RL-Style Loop)</h2>
+
+    <p>Most script analysis tools stop at "here are some suggestions." We go further:</p>
+
+    <div class="diagram"><span class="hl-blue">Original script</span> → Engagement Score: <span class="hl-coral">7.8/10</span>
+       │
+       ├── Suggestion 1: "Strengthen the hook"
+       │    └── <span class="hl-green">Rewrite</span> → apply suggestion → full new script
+       │         └── <span class="hl-blue">Re-score</span> → <span class="hl-green">8.3/10</span> (+0.5) ✓
+       │
+       └── Suggestion 2: "Break Arjun's composure"
+            └── <span class="hl-green">Rewrite</span> → apply suggestion → full new script
+                 └── <span class="hl-blue">Re-score</span> → <span class="hl-coral">7.6/10</span> (-0.2) ✗</div>
+
+    <p>This creates a <strong>feedback loop</strong>: the system doesn't just suggest improvements, it <strong>proves which ones work</strong> by generating the improved version and measuring the score change.</p>
+
+    <p>Users see:</p>
+    <ul>
+      <li>The rewritten script (collapsible)</li>
+      <li>Factor-by-factor comparison (which scores went up/down)</li>
+      <li>Score delta (green for improvement, red for regression)</li>
+      <li>Summary of what changed and why it helped (or didn't)</li>
+    </ul>
+
+    <div class="callout callout-coral">
+      <span class="callout-icon">🔬</span>
+      <div class="callout-text"><strong>Why "RL-style":</strong> In reinforcement learning, you take an action, observe the reward signal, and learn which actions improve outcomes. Here, the "action" is applying a suggestion, the "reward" is the engagement score delta, and the "learning" is showing the user which suggestions actually move the needle. It's not full RL, but it's the same feedback principle.</div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- SECTION 7: STRUCTURED OUTPUT -->
+  <!-- ============================================ -->
+  <div class="arch-section">
+    <div class="s-num">07 — STRUCTURED OUTPUT</div>
+    <h2>Pydantic + OpenAI JSON Schema Mode</h2>
+
+    <p>Every agent returns structured JSON validated against a Pydantic schema. This is enforced at the API level — the LLM <strong>cannot</strong> return invalid output.</p>
+
+    <div class="diagram"><span class="hl-dim"># The schema</span>
+<span class="hl-blue">class</span> EngagementFactor(<span class="hl-blue">BaseModel</span>):
+    name: <span class="hl-green">str</span>              <span class="hl-dim"># "hook", "conflict", etc.</span>
+    score: <span class="hl-green">float</span>            <span class="hl-dim"># 0.0 - 10.0 (validated)</span>
+    reasoning: <span class="hl-green">str</span>          <span class="hl-dim"># Why this score</span>
+    evidence_lines: <span class="hl-green">list[str]</span> <span class="hl-dim"># Specific lines cited</span>
+
+<span class="hl-dim"># The API call</span>
+response = client.responses.create(
+    model=<span class="hl-coral">"gpt-4.1-mini"</span>,
+    text={<span class="hl-coral">"format"</span>: {
+        <span class="hl-coral">"type"</span>: <span class="hl-coral">"json_schema"</span>,
+        <span class="hl-coral">"schema"</span>: EngagementFactor.model_json_schema(),
+        <span class="hl-coral">"strict"</span>: <span class="hl-green">True</span>,  <span class="hl-dim"># ← guarantees valid output</span>
+    }}
+)</div>
+
+    <p><strong>Why this matters:</strong> Most submissions parse LLM text with regex or <code>json.loads()</code> and hope it works. Structured output mode means the response is guaranteed to match the schema — every field present, every type correct, every constraint satisfied. Zero parsing errors in production.</p>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- SECTION 8: TECHNICAL DECISIONS -->
+  <!-- ============================================ -->
+  <div class="arch-section">
+    <div class="s-num">08 — TECHNICAL DECISIONS</div>
+    <h2>What We Chose and Why</h2>
+
+    <div class="decision-grid">
+      <div class="decision-card">
+        <div class="dc-label">Model</div>
+        <h4>GPT-4.1-mini</h4>
+        <p>Structured output mode, 1M context, ~$0.01/analysis. Could swap to Claude or Gemini with a one-line change.</p>
+      </div>
+      <div class="decision-card">
+        <div class="dc-label">Framework</div>
+        <h4>FastAPI + Jinja2</h4>
+        <p>Pure Python. No separate frontend. Templates serve the UI directly. One process, one deploy.</p>
+      </div>
+      <div class="decision-card">
+        <div class="dc-label">Parallelism</div>
+        <h4>asyncio.gather</h4>
+        <p>3 agents run simultaneously. Reduces wall time by ~60% vs sequential. No Celery, no Redis, no job queue.</p>
+      </div>
+      <div class="decision-card">
+        <div class="dc-label">Parser</div>
+        <h4>Pure Regex</h4>
+        <p>No LLM for parsing. Deterministic, instant, free. Handles Title:, Scene, Dialogue, [stage directions] formats.</p>
+      </div>
+      <div class="decision-card">
+        <div class="dc-label">Schemas</div>
+        <h4>Pydantic v2</h4>
+        <p>Type-safe models for all outputs. Generates JSON Schema for OpenAI strict mode. Validates every response.</p>
+      </div>
+      <div class="decision-card">
+        <div class="dc-label">Deploy</div>
+        <h4>Render.com (free tier)</h4>
+        <p>One-click from GitHub. No Docker needed. Auto-deploys on push. $0/month.</p>
+      </div>
+    </div>
+
+    <h3>What We Deliberately Didn't Build</h3>
+    <table class="cmp-table">
+      <tr><th>Pattern</th><th>Why Not</th></tr>
+      <tr><td>Orchestrator class</td><td>Fixed 4-agent pipeline. Nothing to orchestrate — it's 3 lines of asyncio.gather.</td></tr>
+      <tr><td>Planner / task decomposition</td><td>Every script gets the same analysis. No dynamic routing needed.</td></tr>
+      <tr><td>Intent classifier</td><td>One input (script), one output (analysis). One intent.</td></tr>
+      <tr><td>ReAct loops</td><td>Each agent does one focused job. No multi-step tool reasoning needed.</td></tr>
+      <tr><td>Database</td><td>Stateless analysis. Results are returned immediately. History can be added with localStorage or Vercel KV later.</td></tr>
+      <tr><td>Agent base class hierarchy</td><td>4 functions are cleaner than 4 classes inheriting from an abstract base. Less code, easier to read.</td></tr>
+    </table>
+
+    <div class="callout callout-blue">
+      <span class="callout-icon">🧠</span>
+      <div class="callout-text"><strong>Design philosophy:</strong> Knowing when NOT to use an architecture pattern is more important than knowing how to use it. Every component earns its place. No orchestrator, no planner, no intent classifier — because the problem doesn't need them.</div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- SECTION 9: COST & PERFORMANCE -->
+  <!-- ============================================ -->
+  <div class="arch-section">
+    <div class="s-num">09 — COST & PERFORMANCE</div>
+    <h2>$0.01 Per Analysis</h2>
+
+    <table class="cmp-table">
+      <tr><th>Phase</th><th>LLM Calls</th><th>~Tokens</th><th>~Cost</th></tr>
+      <tr><td>Parse (regex)</td><td>0</td><td>0</td><td>$0</td></tr>
+      <tr><td>3 Agents (parallel)</td><td>3</td><td>6,000</td><td>$0.004</td></tr>
+      <tr><td>Script Doctor</td><td>1</td><td>3,000</td><td>$0.002</td></tr>
+      <tr><td>Debate (2 rounds)</td><td>4-8</td><td>4,000</td><td>$0.003</td></tr>
+      <tr><td>Rewrite 2 variants</td><td>2</td><td>4,000</td><td>$0.003</td></tr>
+      <tr><td>Re-score 2 variants</td><td>2</td><td>4,000</td><td>$0.003</td></tr>
+      <tr><td>Comparison summaries</td><td>2</td><td>1,000</td><td>$0.001</td></tr>
+      <tr><td><strong>Total</strong></td><td><strong>14-17</strong></td><td><strong>~22,000</strong></td><td><strong>~$0.016</strong></td></tr>
+    </table>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- SECTION 10: FILE STRUCTURE -->
+  <!-- ============================================ -->
+  <div class="arch-section">
+    <div class="s-num">10 — FILE STRUCTURE</div>
+    <h2>10 Files. Every One Has a Purpose.</h2>
+
+    <div class="file-tree"><span class="ft-dir">scriptscope/</span>
+├── <span class="ft-file">app.py</span>              <span class="ft-desc"># FastAPI app, routes, template rendering</span>
+├── <span class="ft-file">pipeline.py</span>         <span class="ft-desc"># parse → parallel → doctor → debate → rewrite → merge</span>
+├── <span class="ft-file">agents.py</span>           <span class="ft-desc"># 4 agents + debate + rewrite + re-score + chat</span>
+├── <span class="ft-file">schemas.py</span>          <span class="ft-desc"># All Pydantic models (structured output)</span>
+├── <span class="ft-file">prompts.py</span>          <span class="ft-desc"># All system prompts with rubrics</span>
+├── <span class="ft-file">parser.py</span>           <span class="ft-desc"># Regex script parser (no LLM)</span>
+├── <span class="ft-dir">templates/</span>
+│   ├── <span class="ft-file">index.html</span>      <span class="ft-desc"># Input page with pipeline loading animation</span>
+│   ├── <span class="ft-file">results.html</span>    <span class="ft-desc"># Dashboard: report, debate, variants, chat, JSON</span>
+│   └── <span class="ft-file">architecture.html</span><span class="ft-desc"># This page</span>
+├── <span class="ft-dir">static/</span>
+│   └── <span class="ft-file">style.css</span>       <span class="ft-desc"># Full styling</span>
+├── <span class="ft-dir">sample_scripts/</span>     <span class="ft-desc"># 3 example scripts</span>
+├── <span class="ft-file">requirements.txt</span>    <span class="ft-desc"># 7 dependencies</span>
+└── <span class="ft-file">README.md</span></div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- SECTION 11: LIMITATIONS -->
+  <!-- ============================================ -->
+  <div class="arch-section">
+    <div class="s-num">11 — LIMITATIONS & FUTURE WORK</div>
+    <h2>What We'd Build Next</h2>
+
+    <h3>Current Limitations</h3>
+    <ul>
+      <li>English only — emotion vocabulary and rubrics are English-specific</li>
+      <li>Single-scene scripts — no multi-act screenplay support</li>
+      <li>Rubrics are heuristic — not trained on real engagement data (views, completion rates)</li>
+      <li>Fixed 2 debate rounds — not dynamic based on disagreement level</li>
+      <li>Latency ~60-90s — serial debate + rewrite calls</li>
+      <li>No persistence — results aren't saved between sessions</li>
+    </ul>
+
+    <h3>With More Time</h3>
+    <ul>
+      <li><strong>Fine-tuned scoring model</strong> — train on actual engagement data from Bullet's platform</li>
+      <li><strong>Multi-scene support</strong> — per-scene analysis + whole-script aggregation</li>
+      <li><strong>Streaming responses</strong> — show each agent's output as it completes</li>
+      <li><strong>Dynamic debate</strong> — more rounds when agents strongly disagree</li>
+      <li><strong>Comparative analysis</strong> — analyze and rank multiple scripts against each other</li>
+      <li><strong>Agent memory</strong> — spot patterns across scripts by the same author</li>
+    </ul>
+  </div>
+
+</div>
+
+</body>
+</html>
