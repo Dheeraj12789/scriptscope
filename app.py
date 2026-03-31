@@ -32,10 +32,11 @@ if samples_dir.exists():
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "samples": SAMPLES,
-    })
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={"samples": SAMPLES},
+    )
 
 
 @app.post("/analyze", response_class=HTMLResponse)
@@ -43,18 +44,21 @@ async def analyze(request: Request, script: str = Form(...)):
     try:
         result = await run_pipeline(script)
         result_dict = result.model_dump()
-        return templates.TemplateResponse("results.html", {
-            "request": request,
-            "result": result_dict,
-            "result_json": json.dumps(result_dict, indent=2, default=str),
-            "script": script,
-        })
+        return templates.TemplateResponse(
+            request=request,
+            name="results.html",
+            context={
+                "result": result_dict,
+                "result_json": json.dumps(result_dict, indent=2, default=str),
+                "script": script,
+            },
+        )
     except Exception as e:
-        return templates.TemplateResponse("index.html", {
-            "request": request,
-            "samples": SAMPLES,
-            "error": str(e),
-        })
+        return templates.TemplateResponse(
+            request=request,
+            name="index.html",
+            context={"samples": SAMPLES, "error": str(e)},
+        )
 
 
 @app.post("/chat")
@@ -70,7 +74,11 @@ async def chat(request: Request):
 
 @app.get("/architecture", response_class=HTMLResponse)
 async def architecture(request: Request):
-    return templates.TemplateResponse("architecture.html", {"request": request})
+    return templates.TemplateResponse(
+        request=request,
+        name="architecture.html",
+        context={},
+    )
 
 
 @app.get("/api/samples")
